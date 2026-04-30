@@ -112,6 +112,13 @@ function applyBranding() {
 
     const fAddr = document.getElementById('f-address');
     if (fAddr) fAddr.innerText = addr;
+
+    // Update WhatsApp link dynamically
+    const waLink = document.querySelector('.whatsapp-float');
+    if (waLink) {
+        const cleanPhone = phone.split(',')[0].trim().replace(/\D/g, '');
+        waLink.href = `https://wa.me/${cleanPhone.startsWith('977') ? '' : '977'}${cleanPhone}?text=Hello%20Hotel%20Grand%20Tokyo,%20I'd%20like%20to%20inquire%20about%20a%20room.`;
+    }
 }
 
 function buildNavigation() {
@@ -246,10 +253,10 @@ function buildHomePage() {
     if (introItem) {
         const bgImg = introItem.ImageURL ? `<img src="${introItem.ImageURL}" alt="${introItem.Title}" style="width:100%; height:100%; object-fit:cover;">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
         html += `
-        <section class="fade-in">
+        <section class="fade-in reveal-up">
             <div class="container">
                 <div style="display:flex; gap:64px; align-items:center; flex-wrap:wrap;">
-                    <div style="flex: 1 1 400px;">
+                    <div style="flex: 1 1 400px;" class="reveal-up">
                         <div class="section-head" style="margin-bottom: 32px;">
                             <span class="label">The Philosophy</span>
                             <h2 style="font-size: 40px;">${introItem.Title}</h2>
@@ -268,9 +275,9 @@ function buildHomePage() {
     // Room Highlights
     if (siteData.rooms && siteData.rooms.length > 0) {
         html += `
-        <section class="fade-in">
+        <section class="fade-in reveal-up">
             <div class="container">
-                <div class="section-head">
+                <div class="section-head reveal-up">
                     <span class="label">Sanctuary of Excellence</span>
                     <h2>Suites & Private Residences</h2>
                     <p>Where traditional Japanese minimalism meets the pinnacle of futuristic luxury. Experience tranquility above the pulse of the city.</p>
@@ -919,7 +926,7 @@ function initAnimations() {
         });
     }, { threshold: 0.1 });
 
-    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+    document.querySelectorAll('.fade-in, .reveal-up').forEach(el => observer.observe(el));
 }
 
 function initFAQ() {
