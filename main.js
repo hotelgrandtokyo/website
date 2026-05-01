@@ -1015,7 +1015,7 @@ async function handleBookingSubmit(e) {
 
     const submitBtn = document.getElementById(`booking-submit-btn${sfx}`);
     const statusDiv = document.getElementById(`form-status${sfx}`);
-
+    
     // Client-side rate limiting (1-minute cooldown)
     if (submitBtn.getAttribute('data-last-click') && Date.now() - submitBtn.getAttribute('data-last-click') < 60000) {
         statusDiv.textContent = 'Please wait 1 minute before submitting another request.';
