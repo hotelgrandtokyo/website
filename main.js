@@ -33,7 +33,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. Fetch fresh data in the background
     fetchDataInBackground();
+
+    // 5. WhatsApp Blink Logic
+    // No persistence needed - will reset on every reload as requested
 });
+
+function stopWaBlink(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const waFloat = document.getElementById('wa-float');
+    const waStopTag = document.getElementById('wa-stop-tag');
+    
+    if (waFloat) waFloat.classList.remove('blink');
+    if (waStopTag) waStopTag.style.display = 'none';
+}
 
 const API_KEY = "TOKYO_PRIVATE_KEY_9801";
 
@@ -202,6 +217,9 @@ function renderCurrentPage() {
         html = buildFAQPage();
     } else if (pageName === 'guide') {
         html = buildGuidePage();
+    } else if (pageName.startsWith('room/')) {
+        const roomTitle = decodeURIComponent(location.hash.split('/')[1]);
+        html = buildRoomDetailPage(roomTitle);
     } else if (pageName === 'about' && siteData.about) {
         html = buildAboutPage();
     } else if (siteData[pageName]) {
@@ -416,24 +434,25 @@ function buildListPage(pageName, items) {
     let html = `
     <section class="page-hero">
         <div class="container fade-in" style="width:100%;">
-            <span class="label">Explore</span>
+            <span class="label">Our Collection</span>
             <h1 class="page-hero-title">${title}</h1>
         </div>
     </section>
-    <section class="fade-in"><div class="container">`;
+    <section class="fade-in">
+        <div class="container">`;
 
-    if (pageName === 'rooms') {
+    if (items.length === 0) {
+        html += `<div class="room-grid">${buildSkeleton('list')}</div>`;
+    } else if (pageName === 'rooms') {
         html += `<div class="room-grid">${items.map(buildRoomCard).join('')}</div>`;
-    } else if (pageName === 'services') {
-        html += `<div class="room-grid">${items.map(buildServiceCard).join('')}</div>`;
     } else if (pageName === 'offers') {
         html += `<div class="room-grid">${items.map(buildOfferCard).join('')}</div>`;
-    } else if (pageName === 'blogs') {
-        html += `<div class="room-grid">${items.map(buildBlogCard).join('')}</div>`;
+    } else if (pageName === 'services') {
+        html += `<div class="room-grid">${items.map(buildServiceCard).join('')}</div>`;
     } else if (pageName === 'gallery') {
-        html += `<div class="room-grid">${items.map(img => `
+        html += `<div class="gallery-grid">${items.map(img => `
             <div class="room-card fade-in">
-                <div class="room-img-wrap" style="height: 400px;">
+                <div class="room-img-wrap" style="height: 300px;">
                     <img src="${img.ImageURL}" alt="${img.Caption}">
                 </div>
                 <div class="room-details" style="margin-top:0; background:transparent; padding: 24px;">
@@ -445,6 +464,33 @@ function buildListPage(pageName, items) {
     }
 
     html += `</div></section>`;
+    return html;
+}
+
+function buildSkeleton(type) {
+    let html = '';
+    if (type === 'list') {
+        for (let i = 0; i < 6; i++) {
+            html += `
+            <div class="room-card">
+                <div class="room-img-wrap skeleton"></div>
+                <div class="room-details">
+                    <div class="skeleton" style="height: 12px; width: 40%; margin-bottom: 12px;"></div>
+                    <div class="skeleton" style="height: 24px; width: 80%; margin-bottom: 16px;"></div>
+                    <div class="skeleton" style="height: 60px; width: 100%;"></div>
+                </div>
+            </div>`;
+        }
+    } else if (type === 'home') {
+        html = `
+        <div class="skeleton" style="height: 80vh; width: 100%;"></div>
+        <div class="container" style="margin-top: 60px;">
+            <div class="skeleton" style="height: 40px; width: 30%; margin-bottom: 32px;"></div>
+            <div class="room-grid">
+                ${buildSkeleton('list')}
+            </div>
+        </div>`;
+    }
     return html;
 }
 
@@ -793,19 +839,32 @@ function build404Page() {
 
 // --- COMPONENT BUILDERS ---
 function buildRoomCard(room) {
-    const bgImg = room.ImageURL ? `<img src="${room.ImageURL}" alt="${room.Title}">` : `<img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop" alt="${room.Title}">`;
+    // Handle comma-separated images in a single column
+    let images = [];
+    if (room.ImageURL) {
+        images = room.ImageURL.split(',').map(url => url.trim()).filter(url => url !== '');
+    }
+    
+    // Fallback if no images found
+    if (images.length === 0) images.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop');
+
+    const roomLink = `#Room/${encodeURIComponent(room.Title)}`;
+    
     return `
-    <div class="room-card fade-in">
+    <div class="room-card fade-in" onclick="location.hash='${roomLink}'" style="cursor:pointer;">
         <div class="room-img-wrap">
-            ${bgImg}
+            <div class="room-img-slider">
+                ${images.map((img, i) => `<img src="${img}" alt="${room.Title}" class="${i === 0 ? 'active' : ''}">`).join('')}
+            </div>
+            ${images.length > 1 ? '<div class="slider-hint"><i class="fa-solid fa-images"></i> View All Photos</div>' : ''}
         </div>
         <div class="room-details">
-            <span class="label">${room.Guests}</span>
+            <span class="label">${room.Guests || 'Luxurious Stay'}</span>
             <h3>${room.Title}</h3>
             <p>${room.Description}</p>
             <div class="room-meta">
-                <div class="price-badge">${room.Price}</div>
-                <div class="book-link" onclick="openModal('${room.Title.replace(/'/g, "\\'")}')">Secure Suite &rarr;</div>
+                <div class="price-badge">${room.Price || 'Inquire for Price'}</div>
+                <div class="book-link">Explore Details &rarr;</div>
             </div>
         </div>
     </div>`;
@@ -828,15 +887,45 @@ function buildServiceCard(service) {
 
 function buildOfferCard(offer) {
     const bgImg = offer.ImageURL ? `<img src="${offer.ImageURL}" alt="${offer.Title}">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
+    
+    // Check if rate/price exists - Ensure it's a string before calling trim()
+    const rawRate = offer.Price || offer.Rate || '';
+    const rate = String(rawRate).trim();
+    const hasRate = rate !== '' && rate.toLowerCase() !== 'n/a';
+    
+    // Ensure title is a string
+    const title = String(offer.Title || 'Special Offer');
+    
+    // WhatsApp dynamic messages
+    const waTextInquiry = encodeURIComponent(`Hello Hotel Grand Tokyo, I have a question regarding the "${title}" offer. Can you please help?`);
+    const waPhone = (settings.contactPhone || '9761799648').split(',')[0].trim().replace(/\D/g, '');
+    const waBase = `https://wa.me/${waPhone.startsWith('977') ? '' : '977'}${waPhone}`;
+
     return `
-    <div class="room-card fade-in">
+    <div class="room-card offer-card fade-in">
         <div class="room-img-wrap">
             ${bgImg}
+            <div class="offer-tag-overlay">${offer.Tag || 'Exclusive Offer'}</div>
         </div>
         <div class="room-details">
-            <span class="label">${offer.Tag || 'Exclusive'}</span>
-            <h3>${offer.Title}</h3>
-            <p style="margin-bottom:0;">${offer.Description}</p>
+            <span class="label">${offer.Category || 'Special Deal'}</span>
+            <h3>${title}</h3>
+            <p>${offer.Description}</p>
+            
+            <div class="offer-actions">
+                ${hasRate ? `
+                    <div class="offer-price-row">
+                        <span class="offer-amount">${rate}</span>
+                        <button class="btn-offer-primary" onclick="openModal('${title.replace(/'/g, "\\'")}', true, '${rate}')" style="width:auto; padding: 12px 24px;">
+                            <i class="fa-solid fa-calendar-check"></i> Book Now
+                        </button>
+                    </div>
+                ` : `
+                    <a href="${waBase}?text=${waTextInquiry}" target="_blank" class="btn-offer-whatsapp">
+                        <i class="fa-solid fa-circle-question"></i> Inquiry Now
+                    </a>
+                `}
+            </div>
         </div>
     </div>`;
 }
@@ -917,16 +1006,101 @@ function setupStaticListeners() {
 }
 
 function initAnimations() {
-    const observer = new IntersectionObserver((entries) => {
+    // Advanced Scroll Reveal
+    const revealObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                observer.unobserve(entry.target);
+                // Optional: stop observing once revealed
+                // revealObserver.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.1 });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
-    document.querySelectorAll('.fade-in, .reveal-up').forEach(el => observer.observe(el));
+    document.querySelectorAll('.fade-in, section, .room-card, .section-head, .reveal-up').forEach(el => {
+        revealObserver.observe(el);
+    });
+
+    // Room Card Image Cycling on Hover
+    document.addEventListener('mouseover', (e) => {
+        const card = e.target.closest('.room-card');
+        if (!card) return;
+        
+        const slider = card.querySelector('.room-img-slider');
+        if (!slider || slider.children.length <= 1) return;
+        
+        if (card.getAttribute('data-slider-timer')) return;
+
+        const imgs = Array.from(slider.children);
+        if (imgs.length <= 1) return;
+
+        const timer = setInterval(() => {
+            const activeImg = slider.querySelector('img.active');
+            let nextImg = activeImg.nextElementSibling;
+            if (!nextImg) nextImg = imgs[0];
+            
+            activeImg.classList.remove('active');
+            nextImg.classList.add('active');
+        }, 1500); // Slightly faster for better engagement
+        
+        card.setAttribute('data-slider-timer', timer);
+    });
+
+    // Mobile Auto-Cycle on Scroll (Intersection Observer)
+    const sliderObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            const card = entry.target;
+            const slider = card.querySelector('.room-img-slider');
+            if (!slider || slider.children.length <= 1) return;
+
+            // Only auto-cycle on mobile/touch devices
+            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            if (!isTouch) return;
+
+            if (entry.isIntersecting) {
+                if (card.getAttribute('data-slider-timer')) return;
+                
+                const timer = setInterval(() => {
+                    const activeImg = slider.querySelector('img.active');
+                    let nextImg = activeImg.nextElementSibling;
+                    if (!nextImg) nextImg = slider.children[0];
+                    
+                    activeImg.classList.remove('active');
+                    nextImg.classList.add('active');
+                }, 2000);
+                card.setAttribute('data-slider-timer', timer);
+            } else {
+                const timer = card.getAttribute('data-slider-timer');
+                if (timer) {
+                    clearInterval(parseInt(timer));
+                    card.removeAttribute('data-slider-timer');
+                }
+            }
+        });
+    }, { threshold: 0.6 });
+
+    document.querySelectorAll('.room-card').forEach(card => sliderObserver.observe(card));
+
+    document.addEventListener('mouseout', (e) => {
+        const card = e.target.closest('.room-card');
+        if (!card) return;
+
+        // Check if we're actually leaving the card
+        if (e.relatedTarget && card.contains(e.relatedTarget)) return;
+
+        const timer = card.getAttribute('data-slider-timer');
+        if (timer) {
+            clearInterval(parseInt(timer));
+            card.removeAttribute('data-slider-timer');
+            
+            // Reset to first image
+            const slider = card.querySelector('.room-img-slider');
+            if (slider) {
+                const imgs = Array.from(slider.children);
+                imgs.forEach((img, i) => img.classList.toggle('active', i === 0));
+            }
+        }
+    });
 }
 
 function initFAQ() {
@@ -957,6 +1131,71 @@ function toggleFAQ(index) {
     });
 }
 
+function buildRoomDetailPage(title) {
+    const room = siteData.rooms.find(r => r.Title === title);
+    if (!room) return build404Page();
+
+    // Handle comma-separated images
+    let images = [];
+    if (room.ImageURL) {
+        images = room.ImageURL.split(',').map(url => url.trim()).filter(url => url !== '');
+    }
+    if (images.length === 0) images.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop');
+
+    const amenities = (room.Amenities || 'WiFi, AC, TV, Hot Water').split(',').map(s => s.trim());
+
+    const iconMap = {
+        'wifi': 'fa-wifi', 'ac': 'fa-snowflake', 'air conditioning': 'fa-snowflake',
+        'tv': 'fa-tv', 'television': 'fa-tv', 'hot water': 'fa-faucet-drip',
+        'shower': 'fa-shower', 'breakfast': 'fa-mug-hot', 'parking': 'fa-square-p',
+        'room service': 'fa-bell-concierge', 'security': 'fa-shield-halved'
+    };
+
+    return `
+    <section class="page-hero" style="min-height: 40vh; background: var(--surface-dim); align-items: flex-end; padding-bottom: 40px;">
+        <div class="container fade-in">
+            <a href="#Rooms" class="btn-outline" style="margin-bottom: 24px; padding: 8px 20px; font-size: 10px;">&larr; Back to Rooms</a>
+            <span class="label">${room.Guests || 'Premium Sanctuary'}</span>
+            <h1 style="font-size: clamp(32px, 5vw, 64px);">${room.Title}</h1>
+        </div>
+    </section>
+
+    <section class="fade-in" style="padding-top: 0;">
+        <div class="container">
+            <div class="detail-grid" style="border: 1px solid rgba(233,193,118,0.2); box-shadow: 0 40px 100px rgba(0,0,0,0.5);">
+                <div class="detail-gallery">
+                    <div class="main-photo" style="height: 500px;">
+                        <img id="main-detail-img" src="${images[0]}" alt="${room.Title}">
+                    </div>
+                    <div class="photo-thumbs">
+                        ${images.map((img, i) => `<img src="${img}" onclick="document.getElementById('main-detail-img').src='${img}'" alt="Thumb ${i+1}">`).join('')}
+                    </div>
+                </div>
+                <div class="detail-info">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 40px; flex-wrap:wrap; gap:20px;">
+                        <div class="price-badge" style="font-size: 28px;">${room.Price || 'Inquire'}</div>
+                        <button class="btn-primary" style="padding: 18px 48px;" onclick="openModal('${room.Title.replace(/'/g, "\\'")}', false, '${room.Price}')">Reserve Now</button>
+                    </div>
+                    
+                    <div class="amenities-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 24px; margin-bottom: 60px;">
+                        ${amenities.map(a => {
+                            const icon = iconMap[a.toLowerCase()] || 'fa-check';
+                            return `<div style="display:flex; align-items:center; gap:12px; font-size: 14px; color: var(--on-surface-variant);">
+                                        <i class="fa-solid ${icon}" style="color:var(--primary); width: 20px;"></i> ${a}
+                                    </div>`;
+                        }).join('')}
+                    </div>
+
+                    <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px;">
+                        <h4 style="margin-bottom: 24px; font-family: var(--font-label); text-transform: uppercase; font-size: 12px; letter-spacing: 0.2em; color: var(--primary);">The Sanctuary Experience</h4>
+                        <p style="color: var(--on-surface-variant); font-size: 16px; line-height: 2; white-space: pre-line;">${room.LongDescription || room.Description}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>`;
+}
+
 function handleScroll() {
     const header = document.getElementById('main-header');
     if (header) header.classList.toggle('scrolled', window.scrollY > 50);
@@ -971,25 +1210,103 @@ function handleScroll() {
     }
 }
 
-function openModal(roomName = null) {
-    document.getElementById('booking-modal').classList.add('active');
+function openModal(roomName = null, isOffer = false, rate = null) {
+    const modal = document.getElementById('booking-modal');
+    modal.classList.add('active');
 
-    // Pre-select room if passed
-    if (roomName) {
-        const selects = [document.getElementById('b-room'), document.getElementById('b-room-page')];
+    const selects = [document.getElementById('b-room'), document.getElementById('b-room-page')];
+    const rateInputs = [document.getElementById('b-rate'), document.getElementById('b-rate-page')];
+    const priceWrap = document.getElementById('b-price-selection-wrap');
+    const priceBoxContainer = document.getElementById('b-price-boxes');
+    
+    // Set rate if provided
+    if (rate) {
+        rateInputs.forEach(input => { if (input) input.value = rate; });
+
+        // Handle Rate Ranges (e.g., 1000-1300)
+        if (rate.includes('-') && priceWrap && priceBoxContainer) {
+            const parts = rate.split('-').map(p => parseInt(p.replace(/\D/g, '')));
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                const min = Math.min(parts[0], parts[1]);
+                const max = Math.max(parts[0], parts[1]);
+                let boxesHtml = '';
+                for (let val = min; val <= max; val += 100) {
+                    boxesHtml += `<div class="price-box ${val === min ? 'active' : ''}" onclick="selectPriceBox(this, '${val}')">${val}</div>`;
+                }
+                // Add max if not added by the loop
+                if ((max - min) % 100 !== 0) {
+                    boxesHtml += `<div class="price-box" onclick="selectPriceBox(this, '${max}')">${max}</div>`;
+                }
+                priceBoxContainer.innerHTML = boxesHtml;
+                priceWrap.style.display = 'block';
+                // Initialize the hidden input with the default active value
+                rateInputs.forEach(input => { if (input) input.value = min; });
+            } else {
+                if (priceWrap) priceWrap.style.display = 'none';
+            }
+        } else {
+            if (priceWrap) priceWrap.style.display = 'none';
+        }
+    } else {
+        rateInputs.forEach(input => { if (input) input.value = ''; });
+        if (priceWrap) priceWrap.style.display = 'none';
+    }
+
+    if (isOffer && roomName) {
+        // If it's an offer, restrict dropdown to JUST that offer
+        selects.forEach(select => {
+            if (select) {
+                select.innerHTML = `<option value="${roomName}" selected>${roomName}</option>`;
+                select.setAttribute('data-offer-mode', 'true');
+            }
+        });
+    } else if (roomName) {
+        // Normal room selection - first ensure standard rooms are populated
+        if (selects[0] && selects[0].getAttribute('data-offer-mode') === 'true') {
+            populateModalRooms();
+        }
         selects.forEach(select => {
             if (select) {
                 const option = Array.from(select.options).find(opt => opt.value === roomName);
                 if (option) option.selected = true;
             }
         });
+    } else {
+        // Generic open - ensure standard rooms are populated
+        if (selects[0] && selects[0].getAttribute('data-offer-mode') === 'true') {
+            populateModalRooms();
+        }
     }
 }
 function closeModal() {
-    document.getElementById('booking-modal').classList.remove('active');
+    const modal = document.getElementById('booking-modal');
+    modal.classList.remove('active');
+    
+    // Reset dropdowns if they were in offer mode
+    const selects = [document.getElementById('b-room'), document.getElementById('b-room-page')];
+    if (selects[0] && selects[0].getAttribute('data-offer-mode') === 'true') {
+        populateModalRooms();
+    }
 }
 function toggleMobileMenu() {
-    document.getElementById('mobile-menu').classList.toggle('active');
+    const menu = document.getElementById('mobile-menu');
+    const body = document.body;
+    const isOpen = menu.classList.toggle('active');
+    body.style.overflow = isOpen ? 'hidden' : '';
+    
+    // Animate items with delay
+    if (isOpen) {
+        const links = menu.querySelectorAll('li');
+        links.forEach((link, i) => {
+            link.style.opacity = '0';
+            link.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                link.style.transition = 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+                link.style.opacity = '1';
+                link.style.transform = 'translateY(0)';
+            }, 100 + (i * 100));
+        });
+    }
 }
 
 function populateModalRooms() {
@@ -998,6 +1315,7 @@ function populateModalRooms() {
         roomSelects.forEach(select => {
             if (select) {
                 select.innerHTML = siteData.rooms.map(r => `<option value="${r.Title}">${r.Title}</option>`).join('');
+                select.removeAttribute('data-offer-mode');
             }
         });
     }
@@ -1030,7 +1348,16 @@ async function handleBookingSubmit(e) {
     const checkin = document.getElementById(`b-checkin${sfx}`)?.value || 'N/A';
     const checkout = document.getElementById(`b-checkout${sfx}`)?.value || 'N/A';
     const rawMessage = document.getElementById(`b-message${sfx}`).value.trim() || 'No special requests';
-    const combinedMessage = `Dates: ${checkin} to ${checkout}\n\nRequests: ${rawMessage}`;
+    
+    let rateValue = document.getElementById(`b-rate${sfx}`)?.value || 'N/A';
+    // Use selected price if range was active
+    const priceSelect = document.getElementById('b-price-selection');
+    const priceWrap = document.getElementById('b-price-selection-wrap');
+    if (!isPage && priceWrap && priceWrap.style.display !== 'none' && priceSelect) {
+        rateValue = priceSelect.value;
+    }
+
+    const combinedMessage = `Rate: ${rateValue}\nDates: ${checkin} to ${checkout}\n\nRequests: ${rawMessage}`;
 
     const bookingData = {
         name: document.getElementById(`b-name${sfx}`).value.trim(),
@@ -1059,6 +1386,19 @@ async function handleBookingSubmit(e) {
         submitBtn.disabled = false;
         submitBtn.innerText = isPage ? 'Confirm Booking' : 'Request Confirmation';
     }
+}
+
+function selectPriceBox(el, val) {
+    // Remove active class from all sibling boxes
+    const container = el.parentElement;
+    container.querySelectorAll('.price-box').forEach(box => box.classList.remove('active'));
+    
+    // Add active class to clicked box
+    el.classList.add('active');
+    
+    // Update the hidden rate input
+    const selects = [document.getElementById('b-rate'), document.getElementById('b-rate-page')];
+    selects.forEach(input => { if (input) input.value = val; });
 }
 
 async function handleNewsletterSubmit(e) {

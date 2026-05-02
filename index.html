@@ -161,6 +161,11 @@
                     <label>Room Type</label>
                     <select id="b-room" required></select>
                 </div>
+                <input type="hidden" id="b-rate" name="rate">
+                <div id="b-price-selection-wrap" style="display:none;" class="input-group">
+                    <label>Select Preferred Rate</label>
+                    <div id="b-price-boxes" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;"></div>
+                </div>
                 <div class="row-group">
                     <div class="input-group">
                         <label>Arrival Date</label>
@@ -196,7 +201,7 @@
     <!-- Header -->
     <header id="main-header">
         <div class="container header-inner">
-            <a href="#Home" class="logo" style="display: flex; align-items: center; gap: 10px;">
+            <a href="/" class="logo" onclick="location.reload(); return false;" style="display: flex; align-items: center; gap: 10px;">
                 <img src="logo.png" alt="Hotel Grand Tokyo Logo" style="height: 44px; width: auto;">
                 <span id="brand-text"
                     style="font-family: 'Noto Serif', serif; font-size: 24px; color: var(--primary); display: none;"></span>
@@ -346,11 +351,16 @@
     </footer>
 
     <!-- WhatsApp Floating Button -->
-    <a href="https://wa.me/9779761799648?text=Hello%20Hotel%20Grand%20Tokyo,%20I'd%20like%20to%20inquire%20about%20a%20room."
-        class="whatsapp-float" target="_blank" aria-label="Chat with Concierge on WhatsApp">
-        <i class="fa-brands fa-whatsapp"></i>
-        <span class="wa-tooltip">Inquire Now</span>
-    </a>
+    <div class="wa-container" id="wa-container">
+        <div class="wa-stop-blink" id="wa-stop-tag" onclick="stopWaBlink(event)">
+            Stop blinking <span>&times;</span>
+        </div>
+        <a href="https://wa.me/9779761799648?text=Hello%20Hotel%20Grand%20Tokyo,%20I'd%20like%20to%20inquire%20about%20a%20room."
+            class="whatsapp-float blink" id="wa-float" target="_blank" aria-label="Chat with Concierge on WhatsApp">
+            <i class="fa-brands fa-whatsapp"></i>
+            <div class="wa-tooltip">Chat with Concierge</div>
+        </a>
+    </div>
 
     <button id="back-to-top-btn" title="Go to top"><i class="fa-solid fa-arrow-up"></i></button>
 
