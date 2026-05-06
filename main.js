@@ -177,7 +177,7 @@ const PAGE_SEO = {
     booking: { title: `Book Your Stay | Hotel Grand Tokyo Sundhara Kathmandu`, desc: `Secure your clean room at Hotel Grand Tokyo, Kathmandu. Easy online booking for the best budget hotel experience in Sundhara near Civil Mall.` },
     faq: { title: `FAQ - Frequently Asked Questions | Hotel Grand Tokyo`, desc: `Find answers to common questions about amenities and services at Hotel Grand Tokyo in Sundhara, Kathmandu. We are here to help you plan your stay.` },
     guide: { title: `Traveler's Handbook | Kathmandu Guide | Hotel Grand Tokyo`, desc: `A complete travel guide for Kathmandu visitors. Get local tips, safety advice, and must-visit spots around Sundhara from the Hotel Grand Tokyo experts.` },
-    404: { title: `Page Not Found | Hotel Grand Tokyo Kathmandu`, desc: `The page you are looking for does not exist. Return to Hotel Grand Tokyo's home page for budget rooms and hygienic food in Sundhara.` }
+    404_forced: { title: `Page Not Found | Hotel Grand Tokyo Kathmandu`, desc: `The page you are looking for does not exist. Return to Hotel Grand Tokyo's home page for budget rooms and hygienic food in Sundhara.` }
 };
 
 function setPageSEO(pageName) {
