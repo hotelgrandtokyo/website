@@ -671,11 +671,6 @@ section {
     z-index: 2;
 }
 
-.room-card:hover .room-img-slider img {
-    /* Subtle cycle animation on hover if JS is active, 
-       but for simplicity we'll just show the first one 
-       unless JS handles the class swap. */
-}
 
 .slider-hint {
     position: absolute;
@@ -932,9 +927,125 @@ footer::before {
     box-shadow: 0 10px 10px -10px rgba(233, 193, 118, 0.4);
 }
 
+/* Date Picker Dark Theme */
+input[type="date"] {
+    color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8) sepia(100%) saturate(1000%) hue-rotate(0deg);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
 .input-group input:focus + label {
     color: var(--primary);
     transform: translateX(4px);
+}
+
+/* --- COUNTRY DROPDOWN (SEARCHABLE) --- */
+.country-dropdown {
+    position: relative;
+    flex: 0 0 160px;
+    z-index: 10;
+}
+
+.dropdown-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--on-surface);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.country-dropdown.active .dropdown-trigger {
+    border-bottom-color: var(--primary);
+    color: var(--primary);
+}
+
+.dropdown-trigger .selected-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 8px;
+}
+
+.dropdown-content {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 260px;
+    background: var(--surface-bright);
+    border: 1px solid rgba(233, 193, 118, 0.2);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+    display: none;
+    flex-direction: column;
+    margin-top: 8px;
+    animation: fadeInDown 0.3s ease;
+}
+
+.country-dropdown.active .dropdown-content {
+    display: flex;
+}
+
+.dropdown-search {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+    font-size: 13px !important;
+    width: 100% !important;
+    outline: none !important;
+}
+
+.dropdown-options {
+    max-height: 250px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) transparent;
+}
+
+.dropdown-option {
+    padding: 10px 15px;
+    font-size: 13px;
+    color: var(--on-surface-variant);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dropdown-option:hover {
+    background: rgba(233, 193, 118, 0.1);
+    color: var(--primary);
+}
+
+.dropdown-option.selected {
+    background: var(--primary);
+    color: var(--on-primary);
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+    .country-dropdown {
+        flex: 1;
+        width: 100%;
+    }
+    .dropdown-content {
+        width: 100%;
+    }
 }
 
 /* Fix for invisible calendar icon on dark backgrounds */

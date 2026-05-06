@@ -147,11 +147,32 @@
             <form id="booking-form">
                 <div class="input-group">
                     <label>Full Name</label>
-                    <input type="text" id="b-name" required>
+                    <input type="text" id="b-name" required maxlength="50" pattern="[a-zA-Z\s]+" title="Name should only contain letters and spaces">
                 </div>
                 <div class="input-group">
-                    <label>Phone</label>
-                    <input type="tel" id="b-phone" required>
+                    <label>Phone Number</label>
+                    <div class="phone-input-wrap">
+                        <!-- Searchable Dropdown Mock (Hydrated by JS) -->
+                        <div class="country-dropdown" id="b-country-code-dropdown">
+                            <input type="hidden" id="b-country-code" value="+977">
+                            <div class="dropdown-trigger" onclick="toggleCountryDropdown('b-country-code')">
+                                <span class="selected-text">Nepal (+977)</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="dropdown-content">
+                                <input type="text" class="dropdown-search" placeholder="Search country..." onkeyup="filterCountries(this)">
+                                <div class="dropdown-options">
+                                    <!-- Options will be populated or stay static if preferred, 
+                                         but we'll keep it consistent with the JS builder -->
+                                    <div class="dropdown-option selected" data-value="+977" data-name="Nepal" onclick="selectCountry('b-country-code', '+977', 'Nepal')">Nepal (+977)</div>
+                                    <div class="dropdown-option" data-value="+91" data-name="India" onclick="selectCountry('b-country-code', '+91', 'India')">India (+91)</div>
+                                    <div class="dropdown-option" data-value="+1" data-name="USA" onclick="selectCountry('b-country-code', '+1', 'USA')">USA (+1)</div>
+                                    <div class="dropdown-option" data-value="+44" data-name="UK" onclick="selectCountry('b-country-code', '+44', 'UK')">UK (+44)</div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="tel" id="b-phone" placeholder="98XXXXXXXX" required maxlength="10" pattern="[0-9]{10}" title="Please enter exactly 10 digits">
+                    </div>
                 </div>
                 <div class="input-group">
                     <label>Email</label>

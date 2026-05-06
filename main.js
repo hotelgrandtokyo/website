@@ -16,10 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const parsed = JSON.parse(cachedData);
             siteData = parsed.data;
-            if (siteData.home_content && !siteData.home) {
-                siteData.home = siteData.home_content;
-            }
             settings = parsed.settings;
+            
+            // Standardize home_content to home
+            if (siteData.home_content) siteData.home = siteData.home_content;
+            
             applyBranding();
             populateModalRooms();
             buildNavigation();
@@ -62,16 +63,12 @@ async function fetchDataInBackground() {
             const freshDataStr = JSON.stringify({ data: json.data, settings: json.settings });
             const cachedDataStr = localStorage.getItem('goodCMS_data');
 
-            // Only re-render if data has changed or if it was empty
-            if (freshDataStr !== cachedDataStr) {
-                localStorage.setItem('goodCMS_data', freshDataStr);
-                siteData = json.data;
-                // Standardize home_content to home for easier internal usage
-                if (siteData.home_content && !siteData.home) {
-                    siteData.home = siteData.home_content;
-                }
-                settings = json.settings;
+            siteData = json.data;
+            settings = json.settings;
+            if (siteData.home_content) siteData.home = siteData.home_content;
 
+            if (freshDataStr !== cachedDataStr || Object.keys(siteData).length === 0) {
+                localStorage.setItem('goodCMS_data', freshDataStr);
                 applyBranding();
                 populateModalRooms();
                 buildNavigation();
@@ -180,6 +177,7 @@ const PAGE_SEO = {
     booking: { title: `Book Your Stay | Hotel Grand Tokyo Sundhara Kathmandu`, desc: `Secure your clean room at Hotel Grand Tokyo, Kathmandu. Easy online booking for the best budget hotel experience in Sundhara near Civil Mall.` },
     faq: { title: `FAQ - Frequently Asked Questions | Hotel Grand Tokyo`, desc: `Find answers to common questions about amenities and services at Hotel Grand Tokyo in Sundhara, Kathmandu. We are here to help you plan your stay.` },
     guide: { title: `Traveler's Handbook | Kathmandu Guide | Hotel Grand Tokyo`, desc: `A complete travel guide for Kathmandu visitors. Get local tips, safety advice, and must-visit spots around Sundhara from the Hotel Grand Tokyo experts.` },
+    404: { title: `Page Not Found | Hotel Grand Tokyo Kathmandu`, desc: `The page you are looking for does not exist. Return to Hotel Grand Tokyo's home page for budget rooms and hygienic food in Sundhara.` }
 };
 
 function setPageSEO(pageName) {
@@ -190,8 +188,14 @@ function setPageSEO(pageName) {
 }
 
 function renderCurrentPage() {
-    const pageName = (location.hash.replace('#', '') || 'Home').toLowerCase();
+    let pageName = (location.hash.replace('#', '') || 'Home').toLowerCase();
     const app = document.getElementById('app-root');
+
+    // Handle directory-style paths or "out of page" routes
+    const path = window.location.pathname;
+    if (path.includes('.html/') || (path !== '/' && !path.endsWith('.html') && !location.hash && path.length > 1)) {
+        pageName = '404_forced';
+    }
 
     // If data hasn't loaded yet, keep showing skeleton
     if (Object.keys(siteData).length === 0) {
@@ -231,6 +235,7 @@ function renderCurrentPage() {
     app.innerHTML = html;
     initAnimations();
     initFAQ();
+    initDateRestrictions();
 
     // Initialize 3D Tilt Effect on cards
     if (typeof VanillaTilt !== 'undefined') {
@@ -561,11 +566,14 @@ function buildBookingPage() {
                     <div class="row-group">
                         <div class="input-group">
                             <label>Full Name</label>
-                            <input type="text" id="b-name-page" required>
+                            <input type="text" id="b-name-page" required maxlength="50" pattern="[a-zA-Z\s]+" title="Name should only contain letters and spaces">
                         </div>
                         <div class="input-group">
-                            <label>Phone</label>
-                            <input type="tel" id="b-phone-page" required>
+                            <label>Phone Number</label>
+                            <div class="phone-input-wrap">
+                                ${buildCountryDropdown('b-country-code-page')}
+                                <input type="tel" id="b-phone-page" placeholder="98XXXXXXXX" required maxlength="10" pattern="[0-9]{10}" title="Please enter exactly 10 digits">
+                            </div>
                         </div>
                     </div>
                     <div class="input-group">
@@ -628,7 +636,7 @@ function buildContactPage() {
                     <div class="row-group">
                         <div class="input-group">
                             <label>Full Name</label>
-                            <input type="text" id="c-name" required>
+                            <input type="text" id="c-name" required maxlength="50" pattern="[a-zA-Z\s]+" title="Name should only contain letters and spaces">
                         </div>
                         <div class="input-group">
                             <label>Email</label>
@@ -637,8 +645,11 @@ function buildContactPage() {
                     </div>
                     <div class="row-group">
                         <div class="input-group">
-                            <label>Phone</label>
-                            <input type="tel" id="c-phone">
+                            <label>Phone Number</label>
+                            <div class="phone-input-wrap">
+                                ${buildCountryDropdown('c-country-code')}
+                                <input type="tel" id="c-phone" placeholder="98XXXXXXXX" maxlength="10" pattern="[0-9]{10}" title="Please enter exactly 10 digits">
+                            </div>
                         </div>
                         <div class="input-group">
                             <label>Subject</label>
@@ -993,6 +1004,22 @@ function setupStaticListeners() {
     const bookingForm = document.getElementById('booking-form');
     if (bookingForm) bookingForm.addEventListener('submit', handleBookingSubmit);
 
+    // Hydrate static country dropdown in index.html if it exists
+    const staticDropdown = document.getElementById('b-country-code-dropdown');
+    if (staticDropdown) {
+        const optionsList = staticDropdown.querySelector('.dropdown-options');
+        if (optionsList) {
+            optionsList.innerHTML = COUNTRIES.map(c => `
+                <div class="dropdown-option ${c.code === '+977' ? 'selected' : ''}" 
+                     data-value="${c.code}" 
+                     data-name="${c.name}"
+                     onclick="selectCountry('b-country-code', '${c.code}', '${c.name}')">
+                    ${c.name} (${c.code})
+                </div>
+            `).join('');
+        }
+    }
+
     // Listen for dynamically created forms (like contact page or booking page form)
     document.addEventListener('submit', (e) => {
         if (e.target.id === 'booking-form-page') handleBookingSubmit(e);
@@ -1002,6 +1029,46 @@ function setupStaticListeners() {
     // Close modal on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeModal();
+    });
+
+    initDateRestrictions();
+}
+
+function initDateRestrictions() {
+    const today = new Date().toISOString().split('T')[0];
+    // Find all check-in inputs
+    const checkins = document.querySelectorAll('input[id*="checkin"]');
+    
+    checkins.forEach(ci => {
+        ci.min = today;
+        
+        // Find corresponding checkout
+        const isPage = ci.id.includes('-page');
+        const sfx = isPage ? '-page' : '';
+        const co = document.getElementById(`b-checkout${sfx}`);
+        
+        if (co) {
+            co.min = today;
+            
+            ci.addEventListener('change', () => {
+                if (ci.value) {
+                    const nextDay = new Date(ci.value);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    const nextDayStr = nextDay.toISOString().split('T')[0];
+                    co.min = nextDayStr;
+                    if (co.value && co.value < nextDayStr) {
+                        co.value = nextDayStr;
+                    }
+                }
+            });
+            
+            // Set initial min for checkout if checkin already has value
+            if (ci.value) {
+                const nextDay = new Date(ci.value);
+                nextDay.setDate(nextDay.getDate() + 1);
+                co.min = nextDay.toISOString().split('T')[0];
+            }
+        }
     });
 }
 
@@ -1309,6 +1376,195 @@ function toggleMobileMenu() {
     }
 }
 
+// --- VALIDATION HELPERS ---
+function isGibberish(text) {
+    if (!text || text.length < 4) return false;
+    const clean = text.toLowerCase().replace(/[^a-z]/g, '');
+    if (clean.length < 4) return false;
+
+    // 1. Repetitive characters (e.g., "aaaaa")
+    if (/(.)\1{4,}/.test(clean)) return true;
+
+    // 2. Check for long strings of consonants (no vowels)
+    const words = text.split(/\s+/);
+    for (const word of words) {
+        const w = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (w.length > 6) {
+            const vowels = w.match(/[aeiouy]/gi);
+            if (!vowels || vowels.length / w.length < 0.15) return true;
+        }
+        if (w.length > 25) return true;
+    }
+    return false;
+}
+
+// --- COUNTRY DATA ---
+const COUNTRIES = [
+    { name: "Nepal", code: "+977" },
+    { name: "India", code: "+91" },
+    { name: "United States", code: "+1" },
+    { name: "United Kingdom", code: "+44" },
+    { name: "Australia", code: "+61" },
+    { name: "Canada", code: "+1" },
+    { name: "Japan", code: "+81" },
+    { name: "China", code: "+86" },
+    { name: "United Arab Emirates", code: "+971" },
+    { name: "Qatar", code: "+974" },
+    { name: "Saudi Arabia", code: "+966" },
+    { name: "Malaysia", code: "+60" },
+    { name: "South Korea", code: "+82" },
+    { name: "Germany", code: "+49" },
+    { name: "France", code: "+33" },
+    { name: "Singapore", code: "+65" },
+    { name: "Thailand", code: "+66" },
+    { name: "Bangladesh", code: "+880" },
+    { name: "Pakistan", code: "+92" },
+    { name: "Sri Lanka", code: "+94" },
+    { name: "Bhutan", code: "+975" },
+    { name: "Maldives", code: "+960" },
+    { name: "Kuwait", code: "+965" },
+    { name: "Oman", code: "+968" },
+    { name: "Bahrain", code: "+973" },
+    { name: "Hong Kong", code: "+852" },
+    { name: "Israel", code: "+972" },
+    { name: "Italy", code: "+39" },
+    { name: "Spain", code: "+34" },
+    { name: "Netherlands", code: "+31" },
+    { name: "Switzerland", code: "+41" },
+    { name: "Sweden", code: "+46" },
+    { name: "Norway", code: "+47" },
+    { name: "Denmark", code: "+45" },
+    { name: "Finland", code: "+358" },
+    { name: "Russia", code: "+7" },
+    { name: "Brazil", code: "+55" },
+    { name: "South Africa", code: "+27" },
+    { name: "New Zealand", code: "+64" },
+    { name: "Turkey", code: "+90" },
+    { name: "Portugal", code: "+351" },
+    { name: "Ireland", code: "+353" },
+    { name: "Austria", code: "+43" },
+    { name: "Belgium", code: "+32" },
+    { name: "Greece", code: "+30" },
+    { name: "Poland", code: "+48" },
+    { name: "Mexico", code: "+52" },
+    { name: "Argentina", code: "+54" },
+    { name: "Egypt", code: "+20" }
+].sort((a, b) => a.name.localeCompare(b.name));
+
+// Ensure Nepal is first
+const nepalIdx = COUNTRIES.findIndex(c => c.name === "Nepal");
+if (nepalIdx > -1) {
+    const [nepal] = COUNTRIES.splice(nepalIdx, 1);
+    COUNTRIES.unshift(nepal);
+}
+
+function buildCountryDropdown(idPrefix, selectedCode = '+977') {
+    return `
+    <div class="country-dropdown" id="${idPrefix}-dropdown">
+        <input type="hidden" id="${idPrefix}" value="${selectedCode}">
+        <div class="dropdown-trigger" onclick="toggleCountryDropdown('${idPrefix}')">
+            <span class="selected-text">${COUNTRIES.find(c => c.code === selectedCode)?.name || 'Nepal'} (${selectedCode})</span>
+            <i class="fa-solid fa-chevron-down"></i>
+        </div>
+        <div class="dropdown-content">
+            <input type="text" class="dropdown-search" placeholder="Search country..." onkeyup="filterCountries(this)">
+            <div class="dropdown-options">
+                ${COUNTRIES.map(c => `
+                    <div class="dropdown-option ${c.code === selectedCode ? 'selected' : ''}" 
+                         data-value="${c.code}" 
+                         data-name="${c.name}"
+                         onclick="selectCountry('${idPrefix}', '${c.code}', '${c.name}')">
+                        ${c.name} (${c.code})
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    </div>`;
+}
+
+window.toggleCountryDropdown = function(idPrefix) {
+    const dropdown = document.getElementById(`${idPrefix}-dropdown`);
+    const wasActive = dropdown.classList.contains('active');
+    
+    // Close all other dropdowns
+    document.querySelectorAll('.country-dropdown').forEach(d => d.classList.remove('active'));
+    
+    if (!wasActive) {
+        dropdown.classList.add('active');
+        dropdown.querySelector('.dropdown-search').focus();
+    }
+};
+
+window.filterCountries = function(input) {
+    const filter = input.value.toLowerCase();
+    const options = input.parentElement.querySelectorAll('.dropdown-option');
+    options.forEach(opt => {
+        const text = opt.innerText.toLowerCase();
+        opt.style.display = text.includes(filter) ? 'block' : 'none';
+    });
+};
+
+window.selectCountry = function(idPrefix, code, name) {
+    const dropdown = document.getElementById(`${idPrefix}-dropdown`);
+    const input = document.getElementById(idPrefix);
+    const triggerText = dropdown.querySelector('.selected-text');
+    
+    input.value = code;
+    triggerText.innerText = `${name} (${code})`;
+    
+    dropdown.querySelectorAll('.dropdown-option').forEach(opt => opt.classList.remove('selected'));
+    dropdown.querySelector(`[data-value="${code}"][data-name="${name}"]`).classList.add('selected');
+    
+    dropdown.classList.remove('active');
+};
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.country-dropdown')) {
+        document.querySelectorAll('.country-dropdown').forEach(d => d.classList.remove('active'));
+    }
+});
+
+function validateInput(name, message, phone, countryCode, checkin, checkout) {
+    if (!name || name.trim().length < 2) return "Please enter a valid full name.";
+    if (/[^a-zA-Z\s]/.test(name)) return "Name should not contain special characters.";
+    if (isGibberish(name)) return "Name contains random characters. Please enter a real name.";
+
+    // Nepal-specific phone validation
+    if (countryCode === '+977') {
+        const nepalPrefixes = ['980', '981', '982', '984', '985', '986', '970', '971', '972', '974', '975', '976'];
+        if (!nepalPrefixes.some(prefix => phone.startsWith(prefix))) {
+            return "Invalid Nepal number. Must start with 980, 981, 970, etc.";
+        }
+        if (phone.length !== 10) return "Nepal phone numbers must be exactly 10 digits.";
+    } else if (phone && phone.length < 7) {
+        return "Please enter a valid phone number.";
+    }
+
+    // Date Validation
+    if (checkin && checkout) {
+        const d1 = new Date(checkin);
+        const d2 = new Date(checkout);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        if (d1 < today) return "Check-in date cannot be in the past.";
+        if (d2 <= d1) return "Check-out date must be after check-in date.";
+
+        const diffTime = Math.abs(d2 - d1);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays > 30) return "Please contact the hotel for bookings longer than 30 days.";
+    }
+
+    if (message && message !== 'No special requests') {
+        const words = message.trim().split(/\s+/);
+        if (words.length > 100) return "Special requests must be limited to 100 words.";
+        if (isGibberish(message)) return "Message contains random alphabets or gibberish. Please provide a clear request.";
+        if (/[<>#$^*]/.test(message)) return "Please avoid using special characters in your request.";
+    }
+    return null;
+}
+
 function populateModalRooms() {
     const roomSelects = [document.getElementById('b-room'), document.getElementById('b-room-page')];
     if (siteData.rooms && siteData.rooms.length > 0) {
@@ -1334,21 +1590,37 @@ async function handleBookingSubmit(e) {
     const submitBtn = document.getElementById(`booking-submit-btn${sfx}`);
     const statusDiv = document.getElementById(`form-status${sfx}`);
     
-    // Client-side rate limiting (1-minute cooldown)
+    // Clear previous status
+    statusDiv.textContent = '';
+    statusDiv.style.color = 'var(--primary)';
+
+    const name = document.getElementById(`b-name${sfx}`).value.trim();
+    const rawMessage = document.getElementById(`b-message${sfx}`).value.trim() || 'No special requests';
+    const countryCode = document.getElementById(`b-country-code${sfx}`)?.value || '+977';
+    const phoneNum = document.getElementById(`b-phone${sfx}`).value.trim();
+    const checkin = document.getElementById(`b-checkin${sfx}`).value;
+    const checkout = document.getElementById(`b-checkout${sfx}`).value;
+
+    // 1. Validation
+    const validationError = validateInput(name, rawMessage, phoneNum, countryCode, checkin, checkout);
+    if (validationError) {
+        statusDiv.textContent = validationError;
+        statusDiv.style.color = '#ff4b4b';
+        return;
+    }
+
+    // 2. Rate limiting (1-minute cooldown)
     if (submitBtn.getAttribute('data-last-click') && Date.now() - submitBtn.getAttribute('data-last-click') < 60000) {
         statusDiv.textContent = 'Please wait 1 minute before submitting another request.';
         return;
     }
-    submitBtn.setAttribute('data-last-click', Date.now());
 
     submitBtn.disabled = true;
     submitBtn.innerText = 'Processing...';
-    statusDiv.textContent = '';
 
-    const checkin = document.getElementById(`b-checkin${sfx}`)?.value || 'N/A';
-    const checkout = document.getElementById(`b-checkout${sfx}`)?.value || 'N/A';
-    const rawMessage = document.getElementById(`b-message${sfx}`).value.trim() || 'No special requests';
-    
+    // Handle country code + phone
+    const fullPhone = `${countryCode} ${phoneNum}`;
+
     let rateValue = document.getElementById(`b-rate${sfx}`)?.value || 'N/A';
     // Use selected price if range was active
     const priceSelect = document.getElementById('b-price-selection');
@@ -1360,8 +1632,8 @@ async function handleBookingSubmit(e) {
     const combinedMessage = `Rate: ${rateValue}\nDates: ${checkin} to ${checkout}\n\nRequests: ${rawMessage}`;
 
     const bookingData = {
-        name: document.getElementById(`b-name${sfx}`).value.trim(),
-        phone: document.getElementById(`b-phone${sfx}`).value.trim(),
+        name: name,
+        phone: fullPhone,
         email: document.getElementById(`b-email${sfx}`).value.trim(),
         room: document.getElementById(`b-room${sfx}`).value,
         pax: document.getElementById(`b-pax${sfx}`).value,
@@ -1377,11 +1649,13 @@ async function handleBookingSubmit(e) {
 
         if (result.status === 'success') {
             statusDiv.textContent = 'Reservation request received. Check your email.';
+            submitBtn.setAttribute('data-last-click', Date.now());
             e.target.reset();
             setTimeout(() => { if (!isPage) closeModal(); statusDiv.textContent = ''; }, 3000);
         } else throw new Error(result.message || 'Failed');
     } catch (error) {
         statusDiv.textContent = `Error: ${error.message}`;
+        statusDiv.style.color = '#ff4b4b';
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = isPage ? 'Confirm Booking' : 'Request Confirmation';
@@ -1434,33 +1708,53 @@ async function handleContactSubmit(e) {
     const statusDiv = document.getElementById('contact-status');
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
+    const name = document.getElementById('c-name').value.trim();
+    const message = document.getElementById('c-message').value.trim();
+    const countryCode = document.getElementById('c-country-code')?.value || '+977';
+    const phoneNum = document.getElementById('c-phone').value.trim();
+
+    // Clear previous status
+    statusDiv.textContent = '';
+    statusDiv.style.color = 'var(--primary)';
+
+    // 1. Validation
+    const validationError = validateInput(name, message, phoneNum, countryCode);
+    if (validationError) {
+        statusDiv.textContent = validationError;
+        statusDiv.style.color = '#ff4b4b';
+        return;
+    }
+
     try {
-        // 1-minute rate limiting
+        // 2. Rate limiting (1-minute cooldown)
         if (submitBtn.getAttribute('data-last-click') && Date.now() - submitBtn.getAttribute('data-last-click') < 60000) {
             statusDiv.textContent = 'Please wait 1 minute before sending another message.';
             return;
         }
-        submitBtn.setAttribute('data-last-click', Date.now());
 
         submitBtn.disabled = true;
         submitBtn.innerText = 'Sending...';
         statusDiv.textContent = 'Processing your message...';
 
+        const fullPhone = phoneNum ? `${countryCode} ${phoneNum}` : 'N/A';
+
         const formData = new FormData();
-        formData.append('contact-name', document.getElementById('c-name').value.trim());
+        formData.append('contact-name', name);
         formData.append('contact-email', document.getElementById('c-email').value.trim());
-        formData.append('contact-phone', document.getElementById('c-phone').value.trim());
+        formData.append('contact-phone', fullPhone);
         formData.append('contact-subject', document.getElementById('c-subject').value.trim());
-        formData.append('contact-message', document.getElementById('c-message').value.trim());
+        formData.append('contact-message', message);
 
         const result = await fetch(API_URL, { method: 'POST', body: formData }).then(r => r.json());
 
         if (result.status === 'success') {
             statusDiv.textContent = 'Message sent successfully.';
+            submitBtn.setAttribute('data-last-click', Date.now());
             e.target.reset();
         } else throw new Error(result.message);
     } catch (error) {
         statusDiv.textContent = `Error: ${error.message}`;
+        statusDiv.style.color = '#ff4b4b';
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = 'Send Message';
