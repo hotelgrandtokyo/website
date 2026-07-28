@@ -1,51 +1,49 @@
-# Hotel Grand Tokyo - Web Platform
+# Hotel Grand Tokyo Website
 
-A premium, high-performance Single Page Application (SPA) designed for **Hotel Grand Tokyo**, the best budget luxury sanctuary in Sundhara, Kathmandu, Nepal.
+Official website for Hotel Grand Tokyo in Sundhara, Kathmandu.
 
-## 🚀 How It Was Made
+The site is a static single-page hotel website powered by Google Sheets content through a Google Apps Script endpoint. It is designed to feel like a clean, trustworthy budget hotel booking site: fast, photo-led, mobile-friendly, and focused on direct booking.
 
-This website was engineered for speed, aesthetics, and ease of management.
+## Current Website Pattern
 
-- **Architecture**: Single Page Application (SPA) built with **Vanilla JavaScript**.
-- **Data-Driven**: Content is decoupled from the code. It fetches real-time data (rooms, services, testimonials) from a **Google Sheets backend** via a custom **Google Apps Script API**.
-- **Performance**: Implements a **Stale-While-Revalidate** caching strategy using `localStorage`. The site loads instantly from cache while fetching fresh updates in the background.
-- **Design System**: 
-    - **Zenith Obsidian** theme: A curated dark mode with "Brushed Gold" accents.
-    - **Glassmorphism**: High-blur surfaces and 3D floating elements.
-    - **Interactions**: Powered by **VanillaTilt.js** for 3D card effects and custom CSS cubic-bezier animations.
-- **SEO & SEM**: Fully optimized with:
-    - **Semantic HTML5**.
-    - **JSON-LD Schema** (Hotel & FAQ schemas) for rich search results.
-    - **Open Graph & Twitter Cards** for premium social sharing.
-    - **Noscript Fallback**: A static version of the site content for crawlers and JS-disabled environments.
+- Official `www` domain as canonical: `https://www.hotelgrandtokyo.com.np/`
+- Clean hotel homepage with direct booking, WhatsApp, phone, room cards, services, reviews, and visible location
+- Lightweight JavaScript with Google Sheet-driven rooms, offers, services, gallery, testimonials, and settings
+- SEO metadata, Hotel schema, FAQ schema, sitemap, robots file, and social sharing tags
+- Basic browser security headers and safer cache rules for unversioned CSS/JS
 
-## ✨ Features
+## Main Files
 
-- **Dynamic Content Management**: Update rooms, prices, and offers in Google Sheets, and the website updates automatically.
-- **Integrated Booking Flow**: A multi-step reservation inquiry system that notifies the hotel management instantly.
-- **Premium Aesthetics**: Smooth transitions, skeleton loaders, and micro-animations that provide a "Luxury" feel.
-- **Interactive FAQ**: Dynamic accordion-style FAQ section for better user engagement.
-- **Traveler's Handbook**: A dedicated SEO-rich guide for tourists visiting Kathmandu.
-- **Responsive Mastery**: Tailored experiences for Mobile, Tablet, and Desktop users.
+- `index.html` - static shell, SEO tags, booking modal, header, footer
+- `main.js` - Google Sheet fetch, routing, rendering, forms, validation
+- `style.css` - modern hotel design layer and responsive layout
+- `robots.txt` - crawler access and sitemap link
+- `sitemap.xml` - canonical URLs
+- `_headers` - Cloudflare Pages-style cache/security headers
+- `_redirects` - root-to-www and SPA fallback redirects
+- `vercel.json` - Vercel-compatible cache/security headers and SPA fallback
+- `SECURITY-CHECKLIST.md` - Google Sheet and Apps Script hardening notes
+- `managed/` - backend and security files that support the site but are not normal page assets
+- `managed/google-apps-script/Code.gs` - paste/deploy this in the Google Sheet Apps Script project
 
-## ⚠️ Limitations
+## Google Sheet Security
 
-- **Backend Dependency**: The booking and contact forms rely on the Google Apps Script endpoint. If the script is paused or the Google account hits its daily quota, form submissions may fail temporarily.
-- **JavaScript Required**: While a `noscript` fallback exists for SEO, the interactive features and dynamic content require JavaScript to be enabled.
-- **Image Hosting**: Dynamic images are hosted externally. If the external hosting provider is down, some room or blog images might not display.
+Anything inside browser code is public. The `PUBLIC_READ_TOKEN` in `main.js` should only be treated as a public read token, not a real secret.
 
-## 🛡️ Security & Best Practices
+Real protection must happen in Google Apps Script:
 
-- **Spam Protection**: All forms include a hidden "honeypot" field and client-side rate limiting (1-minute cooldown) to prevent automated bot submissions.
-- **XSS Safety**: User-facing status messages are rendered using `textContent` to prevent script injection.
-- **Backend Security**: The `API_KEY` in `main.js` is a shared secret between the website and your Google Apps Script. While visible in the source code, it ensures that random bots cannot easily hit your script without knowing the key.
-- **Data Protection**: Since the website pulls data from Google Sheets, the security of your site's content depends on the **privacy settings of your Google Sheet**. Ensure that only authorized accounts have "Editor" access to the sheet.
+- Keep the Sheet private and restrict editor access.
+- Return only approved public website fields on `GET`.
+- Never return Sheet IDs, admin emails, internal notes, or private guest data.
+- Set admin notification email inside Apps Script, not from browser-submitted data.
+- Validate and sanitize all booking/contact form submissions server-side.
+- Add rate limiting, honeypot checks, and optional Turnstile/reCAPTCHA if spam increases.
 
-## ⏳ Sustainability & Run Duration
+## Deployment Notes
 
-- **Hosting**: Being a static frontend, it can be hosted on platforms like GitHub Pages, Vercel, or Netlify **indefinitely at zero cost**.
-- **Scalability**: The Google Sheets backend can handle thousands of inquiries per month. Google Apps Script's free tier allows for approximately 50–100 emails per day, which is well-suited for a boutique hotel's inquiry volume.
-- **Maintenance**: Minimal. The code is modular and uses standard web technologies, ensuring compatibility with modern browsers for years to come.
+After deployment, confirm:
 
----
-*Developed with precision to transcend traditional hospitality digital standards.*
+- `https://www.hotelgrandtokyo.com.np/` loads directly.
+- `https://hotelgrandtokyo.com.np/` redirects to `https://www.hotelgrandtokyo.com.np/`.
+- `robots.txt`, `sitemap.xml`, canonical tags, Open Graph URLs, and schema all use `www`.
+- Room photos are compressed before upload.

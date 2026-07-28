@@ -1,55 +1,52 @@
-# 📊 Final Project Report: Hotel Grand Tokyo Web Platform
+# Hotel Grand Tokyo Website Modernization Report
 
-**Date:** April 30, 2026  
-**Project Status:** Completed & Deployed  
-**Official Domain:** [hotelgrandtokyo.com.np](https://hotelgrandtokyo.com.np)  
-**Development URL:** [website.hotelgrandtokyo.workers.dev](https://website.hotelgrandtokyo.workers.dev)
+**Updated:** July 28, 2026  
+**Canonical Domain:** https://www.hotelgrandtokyo.com.np/
 
----
+## What Changed
 
-## 🛠️ 1. What We Accomplished
-We transformed a static concept into a high-performance, dynamic luxury hotel platform.
+The website has been shifted from an experimental dark luxury style to a modern budget hotel booking pattern.
 
-### Core Development:
-*   **Architecture**: Built a **Single Page Application (SPA)** using Vanilla JS for maximum speed and zero server overhead.
-*   **Dynamic Engine**: Integrated a **Google Sheets Backend**. You can update rooms, prices, and text without touching code.
-*   **Performance**: Implemented **Stale-While-Revalidate caching**. The site loads instantly while updating in the background.
-*   **Design System**: Developed the **"Zenith Obsidian"** theme—a luxury dark mode with gold accents and glassmorphism.
+The new direction is:
 
-### Premium Features Added:
-*   **WhatsApp Concierge**: A floating, glowing button for direct guest inquiries.
-*   **Skeleton Loaders**: High-end loading animations that eliminate "blank screen" wait times.
-*   **Scroll Animations**: Sections glide into view smoothly as users scroll.
-*   **Custom Branding**: Optimized logo integration, favicon setup, and gold-gradient scrollbars.
+- Clear official hotel identity
+- Clean, warm, trustworthy visual design
+- Direct booking, WhatsApp, and call actions above the fold
+- Room-first presentation with prices and amenities
+- Visible location and trust signals
+- Mobile-friendly layout for Google Maps, WhatsApp, and search visitors
 
----
+## UX Improvements
 
-## 🚀 2. What Happens Now
-The website is now in **Autopilot Mode**.
+- Modernized hero section with practical hotel messaging.
+- Added quick booking strip for fast room inquiries.
+- Kept Book Now visible on mobile.
+- Reduced heavy visual effects and removed 3D tilt dependency.
+- Reworked room cards to show price, amenities, photos, and direct booking action.
+- Replaced luxury wording such as sanctuary/concierge with plain hotel language.
+- Calmed the WhatsApp floating button.
+- Removed fake Twitter action from footer.
 
-1.  **Content Management**: To change a price or a room photo, simply edit your **Google Sheet**. The website will pick up the changes automatically (guests might need to refresh once to see the "freshest" data after a change).
-2.  **Inquiries**: When a guest fills out the **Booking** or **Contact** form, the data is sent to your Google Apps Script, which handles the email notification to `hotelgrandtokyo@gmail.com`.
-3.  **Hosting**: Your site is hosted on **Cloudflare Workers** and linked to **GitHub**. Every time we "pushed" code, Cloudflare updated the live site automatically.
+## SEO Improvements
 
----
+- Updated canonical, Open Graph, Twitter, schema, robots, and sitemap URLs to the `www` domain.
+- Improved homepage title and description for local hotel search.
+- Kept Hotel and FAQ structured data.
+- Added redirects so non-www points to www.
+- Reduced long-term cache on CSS/JS so design updates reach visitors faster.
 
-## 💪 3. What It Can Handle (Capabilities)
-*   **High Traffic**: Because it is a static frontend, it can handle **tens of thousands of visitors** simultaneously without slowing down.
-*   **Instant Updates**: Prices and room availability can be updated globally in seconds via Google Sheets.
-*   **SEO Dominance**: Includes JSON-LD Schema (Hotel/FAQ) and optimized meta tags to help you rank #1 for "Budget Hotel in Sundhara."
-*   **Zero Maintenance**: No plugins to update, no databases to back up, and no security patches to install.
+## Security Improvements
 
----
+- Added a CMS sanitizing layer so Google Sheet text is not treated as executable HTML.
+- Sanitized image/url fields from Sheet-driven content.
+- Removed browser-controlled `adminEmail` from booking submissions.
+- Added basic security headers: `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy`.
+- Added `SECURITY-CHECKLIST.md` for Apps Script and Google Sheet hardening.
 
-## ⚠️ 4. What It Cannot Handle (Limitations)
-*   **Offline Operation**: The site requires an internet connection to fetch the latest data from Google Sheets.
-*   **Payment Processing**: Currently, it handles **Inquiries** (leads), not direct credit card payments. Guests inquire, and you finalize the booking via WhatsApp or Email.
-*   **Large-Scale Blogging**: While it has a "Blogs" section, it is designed for a few high-quality travel guides. It is not a replacement for a massive news site like WordPress.
-*   **Backend Quotas**: Google's free tier for Apps Script limits you to about **100 sent emails per day**. If you receive more than 100 inquiries in a single day, the later ones might not trigger an email notification immediately.
+## Still Recommended
 
----
-
-### **Final Verdict**
-Your hotel now has a **"future-proof"** digital sanctuary that matches the quality of international 5-star chains, while remaining completely free to run and easy to manage.
-
-**The project is now finalized.** 🥂🏨✨
+- Compress `logo.png`; it is too large for a logo.
+- Use real room, bathroom, entrance, and food photos.
+- Add Google Business Profile review/rating links if available.
+- Harden the Apps Script server-side validation and rate limiting.
+- Consider Cloudflare Turnstile if booking/contact spam appears.

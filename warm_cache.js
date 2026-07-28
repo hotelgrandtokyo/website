@@ -4,7 +4,7 @@
  * This ensures that the very first guest of the day gets a "CACHE HIT" (fast load).
  */
 
-const DOMAIN = "https://hotelgrandtokyo.com.np";
+const DOMAIN = "https://www.hotelgrandtokyo.com.np";
 
 const ASSETS = [
     "/",

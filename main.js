@@ -1,5 +1,8 @@
 // ⚠️ REPLACE WITH YOUR APPS SCRIPT URL ⚠️
+// Public Google Apps Script endpoint for approved website content.
+// Do not place private Sheet edit tokens, service-account keys, or admin secrets in this file.
 const API_URL = "https://script.google.com/macros/s/AKfycbw5GcrlUh6ltUfdb-CgvBkEI1LYZAu69XzMXnX49yC1I90QxoL5paGgWAvKiSN1MnpKRw/exec";
+const PUBLIC_READ_TOKEN = "TOKYO_PRIVATE_KEY_9801";
 
 let siteData = {};
 let settings = {};
@@ -15,8 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cachedData) {
         try {
             const parsed = JSON.parse(cachedData);
-            siteData = parsed.data;
-            settings = parsed.settings;
+            siteData = sanitizeCMSData(parsed.data || {});
+            settings = sanitizeCMSData(parsed.settings || {});
             
             // Standardize home_content to home
             if (siteData.home_content) siteData.home = siteData.home_content;
@@ -51,20 +54,24 @@ function stopWaBlink(e) {
     if (waStopTag) waStopTag.style.display = 'none';
 }
 
-const API_KEY = "TOKYO_PRIVATE_KEY_9801";
-
 async function fetchDataInBackground() {
     try {
-        const res = await fetch(`${API_URL}?key=${API_KEY}`);
+        const res = await fetch(`${API_URL}?key=${encodeURIComponent(PUBLIC_READ_TOKEN)}`, {
+            method: 'GET',
+            credentials: 'omit',
+            cache: 'no-store'
+        });
         if (!res.ok) throw new Error(`Network response was not ok: ${res.statusText}`);
         const json = await res.json();
 
         if (json.status === 'success') {
-            const freshDataStr = JSON.stringify({ data: json.data, settings: json.settings });
+            const safeData = sanitizeCMSData(json.data || {});
+            const safeSettings = sanitizeCMSData(json.settings || {});
+            const freshDataStr = JSON.stringify({ data: safeData, settings: safeSettings });
             const cachedDataStr = localStorage.getItem('goodCMS_data');
 
-            siteData = json.data;
-            settings = json.settings;
+            siteData = safeData;
+            settings = safeSettings;
             if (siteData.home_content) siteData.home = siteData.home_content;
 
             if (freshDataStr !== cachedDataStr || Object.keys(siteData).length === 0) {
@@ -83,6 +90,40 @@ async function fetchDataInBackground() {
 }
 
 // --- CORE FUNCTIONS ---
+function escapeHTML(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function sanitizeURL(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+
+    return raw.split(',').map(url => {
+        const clean = url.trim().replace(/[\u0000-\u001F\u007F'"`\\()]/g, '');
+        const isSafeRemote = /^https:\/\//i.test(clean);
+        const isSafeLocal = /^[./][^<>"'`()\\]+$/i.test(clean) || /^[\w-]+\.(png|jpe?g|webp|gif|svg)$/i.test(clean);
+        if (!isSafeRemote && !isSafeLocal) return '';
+        return clean.replace(/[<>]/g, '');
+    }).filter(Boolean).join(',');
+}
+
+function sanitizeCMSData(value, key = '') {
+    if (Array.isArray(value)) return value.map(item => sanitizeCMSData(item, key));
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [childKey, sanitizeCMSData(childValue, childKey)]));
+    }
+    if (typeof value !== 'string') return value;
+
+    if (/url|image|avatar|photo|map/i.test(key)) return sanitizeURL(value);
+    if (/icon/i.test(key)) return value.replace(/[^a-zA-Z0-9\-\s]/g, '').trim();
+    return escapeHTML(value);
+}
+
 function applyBranding() {
     const defaultName = 'Hotel Grand Tokyo';
     const defaultPhone = '9761799648, 01-5904107';
@@ -142,14 +183,14 @@ function buildNavigation() {
 
     [dNav, mNav, fNav].forEach(nav => nav.innerHTML = '');
 
-    const navOrder = ['Home', 'Rooms', 'Services', 'Offers', 'Gallery', 'Blogs', 'Testimonials', 'About', 'FAQ'];
+    const navOrder = ['Home', 'Rooms', 'Services', 'Offers', 'Gallery', 'Testimonials', 'About', 'Contact', 'FAQ'];
 
     navOrder.forEach(page => {
         const key = page.toLowerCase();
         const dataKey = key === 'home' ? 'home_content' : key;
 
         // Always show Home, show others only if they have data
-        if (key === 'home' || key === 'faq' || (siteData[key] && siteData[key].length > 0) || (siteData[dataKey] && siteData[dataKey].length > 0)) {
+        if (key === 'home' || key === 'contact' || key === 'faq' || (siteData[key] && siteData[key].length > 0) || (siteData[dataKey] && siteData[dataKey].length > 0)) {
             const linkHtml = `<a href="#${page}">${page}</a>`;
 
             // Only add FAQ to the footer, skip for main nav and mobile nav
@@ -245,56 +286,80 @@ function renderCurrentPage() {
     initDateRestrictions();
 
     // Initialize 3D Tilt Effect on cards
-    if (typeof VanillaTilt !== 'undefined') {
-        VanillaTilt.init(document.querySelectorAll(".room-card, .glass-floating"), {
-            max: 5,
-            speed: 400,
-            glare: true,
-            "max-glare": 0.15
-        });
-    }
+    // Keep interactions light; the hotel site should feel fast and practical, especially on mobile.
 }
 
 function buildHomePage() {
     let html = '';
 
-    // Hero Section
     const heroItem = siteData.home?.find(item => item.Component === 'HERO');
     if (heroItem) {
-        const bgImg = heroItem.ImageURL ? `background-image: url('${heroItem.ImageURL}');` : `background-image: url('https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=2070&auto=format&fit=crop');`;
+        const bgImg = heroItem.ImageURL ? `background-image: url('${heroItem.ImageURL}');` : '';
         html += `
-        <section class="hero" style="${bgImg}">
+        <section class="hero hgt-hero" style="${bgImg}">
             <div class="hero-overlay"></div>
-            <div class="hero-content">
-                <span class="label" style="letter-spacing: 0.5em; margin-bottom: 24px;">Transcending Hospitality</span>
-                <h1 style="font-size: clamp(40px, 8vw, 80px); line-height: 1.1; margin-bottom: 32px;">${heroItem.Title.replace(/\.{2,}/g, '')}</h1>
-                <p style="color: var(--on-surface-variant); font-size: 18px; max-width: 600px; margin: 0 auto 48px; opacity: 0.9;">${heroItem.Description}</p>
-                <button class="btn-primary" onclick="openModal()" style="padding: 18px 48px; font-size: 14px;">Secure Your Stay</button>
-            </div>
-            <div class="scroll-indicator">
-                <div class="mouse"></div>
-                <span style="font-family: var(--font-label); font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; margin-top: 12px; opacity: 0.6;">Scroll</span>
+            <div class="container hero-content hgt-hero-content">
+                <span class="label">Official Hotel Website</span>
+                <h1>${heroItem.Title.replace(/\.{2,}/g, '') || 'Clean Budget Hotel in Sundhara, Kathmandu'}</h1>
+                <p>${heroItem.Description || 'Comfortable rooms, hygienic food, 24-hour reception, and an easy central location near Civil Mall and Kathmandu Bus Park.'}</p>
+                <div class="hero-actions">
+                    <button class="btn-primary" onclick="openModal()"><i class="fa-solid fa-calendar-check"></i> Book Direct</button>
+                    <a class="btn-outline" href="https://wa.me/9779761799648?text=Hello%20Hotel%20Grand%20Tokyo,%20I%20want%20to%20book%20a%20room." target="_blank"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
+                    <a class="btn-text" href="tel:+9779761799648"><i class="fa-solid fa-phone"></i> Call Now</a>
+                </div>
+                <div class="trust-strip" aria-label="Hotel highlights">
+                    <span><i class="fa-solid fa-location-dot"></i> Sundhara, Kathmandu</span>
+                    <span><i class="fa-solid fa-wifi"></i> Free Wi-Fi</span>
+                    <span><i class="fa-solid fa-shield-halved"></i> CCTV & 24-hour desk</span>
+                    <span><i class="fa-solid fa-utensils"></i> Hygienic food</span>
+                </div>
             </div>
         </section>`;
     }
 
-    // Intro Section
+    html += `
+    <section class="booking-strip-section fade-in" aria-label="Quick booking">
+        <div class="container">
+            <div class="booking-strip">
+                <div>
+                    <span class="label">Fast Reservation</span>
+                    <strong>Need a room today?</strong>
+                    <p>Send dates and guest count. The hotel can confirm by phone or WhatsApp.</p>
+                </div>
+                <button class="btn-primary" onclick="openModal()"><i class="fa-solid fa-bed"></i> Check Room</button>
+                <a class="btn-outline" href="https://maps.app.goo.gl/WLFHrGWnmrztDVqFA" target="_blank"><i class="fa-solid fa-map-location-dot"></i> View Location</a>
+            </div>
+            <nav class="search-intent-bar" aria-label="Popular hotel searches">
+                <span class="search-intent-label"><i class="fa-solid fa-magnifying-glass"></i> Popular searches</span>
+                <a href="#Rooms">Budget rooms in Sundhara</a>
+                <a href="#Rooms">Room price NPR 1000+</a>
+                <a href="#Gallery">Hotel photos</a>
+                <a href="#Contact">Hotel near Civil Mall</a>
+                <a href="#Contact">Call / WhatsApp booking</a>
+            </nav>
+        </div>
+    </section>`;
+
     const introItem = siteData.home?.find(item => item.Component === 'INTRO');
     if (introItem) {
         const bgImg = introItem.ImageURL ? `<img src="${introItem.ImageURL}" alt="${introItem.Title}" style="width:100%; height:100%; object-fit:cover;">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
         html += `
-        <section class="fade-in reveal-up">
+        <section class="fade-in reveal-up intro-section">
             <div class="container">
-                <div style="display:flex; gap:64px; align-items:center; flex-wrap:wrap;">
-                    <div style="flex: 1 1 400px;" class="reveal-up">
+                <div class="split-layout">
+                    <div class="reveal-up">
                         <div class="section-head" style="margin-bottom: 32px;">
-                            <span class="label">The Philosophy</span>
+                            <span class="label">Why Guests Choose Us</span>
                             <h2 style="font-size: 40px;">${introItem.Title}</h2>
                         </div>
                         <p style="color: var(--on-surface-variant); margin-bottom: 24px;">${introItem.Description}</p>
-                        <p style="font-family: var(--font-label); color: var(--primary-dim); text-transform:uppercase; font-size: 12px; letter-spacing:0.1em;">${introItem.Extra_Data || ''}</p>
+                        <div class="feature-list">
+                            <span><i class="fa-solid fa-check"></i> Budget-friendly rooms</span>
+                            <span><i class="fa-solid fa-check"></i> Central Kathmandu location</span>
+                            <span><i class="fa-solid fa-check"></i> Family and tourist friendly</span>
+                        </div>
                     </div>
-                    <div class="glass" style="flex: 1 1 400px; height: 500px; padding: 24px;">
+                    <div class="glass image-panel">
                         ${bgImg}
                     </div>
                 </div>
@@ -308,13 +373,14 @@ function buildHomePage() {
         <section class="fade-in reveal-up">
             <div class="container">
                 <div class="section-head reveal-up">
-                    <span class="label">Sanctuary of Excellence</span>
-                    <h2>Suites & Private Residences</h2>
-                    <p>Where traditional Japanese minimalism meets the pinnacle of futuristic luxury. Experience tranquility above the pulse of the city.</p>
+                    <span class="label">Rooms</span>
+                    <h2>Simple, Clean Rooms for Kathmandu Stays</h2>
+                    <p>Choose a clean, comfortable room with clear details and direct confirmation from the hotel team.</p>
                 </div>
                 <div class="room-grid">
                     ${siteData.rooms.slice(0, 3).map(buildRoomCard).join('')}
                 </div>
+                <div class="section-action"><a class="btn-outline" href="#Rooms">View All Rooms</a></div>
             </div>
         </section>`;
     }
@@ -322,11 +388,11 @@ function buildHomePage() {
     // Services Highlight
     if (siteData.services && siteData.services.length > 0) {
         html += `
-        <section class="fade-in" style="background: var(--surface-dim);">
+        <section class="fade-in muted-section">
             <div class="container">
                 <div class="section-head" style="text-align:center;">
-                    <span class="label">The Art of Living</span>
-                    <h2>Unparalleled Service</h2>
+                    <span class="label">Facilities</span>
+                    <h2>Everything Needed for a Comfortable Stay</h2>
                 </div>
                 <div class="room-grid">
                     ${siteData.services.slice(0, 3).map(buildServiceCard).join('')}
@@ -341,8 +407,8 @@ function buildHomePage() {
         <section class="fade-in">
             <div class="container">
                 <div class="section-head">
-                    <span class="label">Exclusive Curations</span>
-                    <h2>Special Offers</h2>
+                    <span class="label">Offers</span>
+                    <h2>Current Room Deals</h2>
                 </div>
                 <div class="room-grid">
                     ${siteData.offers.slice(0, 3).map(buildOfferCard).join('')}
@@ -354,11 +420,11 @@ function buildHomePage() {
     // Testimonials
     if (siteData.testimonials && siteData.testimonials.length > 0) {
         html += `
-        <section class="fade-in" style="background: var(--surface-dim);">
+        <section class="fade-in muted-section">
             <div class="container">
                 <div class="section-head" style="text-align:center;">
-                    <span class="label">Guest Experiences</span>
-                    <h2>Testimonials</h2>
+                    <span class="label">Guest Trust</span>
+                    <h2>What Guests Say</h2>
                 </div>
                 <div class="room-grid">
                     ${siteData.testimonials.slice(0, 3).map(buildTestimonialCard).join('')}
@@ -367,35 +433,34 @@ function buildHomePage() {
         </section>`;
     }
 
-    // SEO: Map Section (Home)
     html += `
-    <section class="fade-in" style="background: var(--surface-dim); padding-top: 0;">
+    <section class="fade-in location-section">
         <div class="container">
             <div class="section-head">
-                <span class="label">Our Location</span>
-                <h2>Find Us in Sundhara</h2>
-                <p>Centrally located near Civil Mall and the Kathmandu Bus Park. Experience the heart of the city.</p>
+                <span class="label">Location</span>
+                <h2>Stay Near Civil Mall and Sundhara</h2>
+                <p>A practical base for Kathmandu sightseeing, shopping, transit, and airport travel.</p>
             </div>
             
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:30px; margin-bottom:48px;">
+            <div class="info-grid">
                 <div class="glass-floating" style="padding:32px; text-align:center;">
                     <i class="fa-solid fa-location-dot" style="color:var(--primary); font-size:24px; margin-bottom:16px;"></i>
-                    <h3>Physical Address</h3>
+                    <h3>Address</h3>
                     <p>${settings.address || 'Baghdurbar-11, Sundhara, Kathmandu, Nepal'}</p>
                 </div>
                 <div class="glass-floating" style="padding:32px; text-align:center;">
                     <i class="fa-solid fa-phone" style="color:var(--primary); font-size:24px; margin-bottom:16px;"></i>
-                    <h3>Call for Reservations</h3>
+                    <h3>Reservations</h3>
                     <p>${settings.contactPhone || '01-5904107, 9761799648'}</p>
                 </div>
                 <div class="glass-floating" style="padding:32px; text-align:center;">
                     <i class="fa-solid fa-clock" style="color:var(--primary); font-size:24px; margin-bottom:16px;"></i>
-                    <h3>Reception Hours</h3>
+                    <h3>Front Desk</h3>
                     <p>24 Hours / 7 Days</p>
                 </div>
             </div>
 
-            <div class="glass" style="height: 450px; padding: 12px; position: relative; overflow: hidden; border-radius: 4px; margin-bottom: 24px;">
+            <div class="glass map-panel">
                 <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3532.5771298550753!2d85.31124249999999!3d27.699461799999995!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39eb185481713169%3A0x7d58fe7468a19327!2sOyo%20807%20Hotel%20Grand%20Tokyo!5e0!3m2!1sen!2snp!4v1777441533837!5m2!1sen!2snp" 
                         width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
             </div>
@@ -563,13 +628,24 @@ function buildBookingPage() {
     <section class="page-hero">
         <div class="container fade-in" style="width:100%;">
             <span class="label">Reservation</span>
-            <h1 class="page-hero-title">Experience Tranquility</h1>
+            <h1 class="page-hero-title">Book Your Stay</h1>
         </div>
     </section>
-    <section class="fade-in" style="padding-top: 64px;">
-        <div class="container" style="max-width: 800px;">
-            <div class="glass-floating" style="padding: 48px;">
-                <form id="booking-form-page">
+    <section class="fade-in reservation-page-section">
+        <div class="container reservation-page-shell">
+            <aside class="reservation-intro-card">
+                <span class="label">Direct hotel booking</span>
+                <h2>Fast confirmation from the front desk</h2>
+                <p>Send your stay details once. The hotel team will confirm room availability, price, and arrival support by phone or WhatsApp.</p>
+                <div class="reservation-benefits">
+                    <span><i class="fa-solid fa-circle-check"></i> No third-party confusion</span>
+                    <span><i class="fa-solid fa-phone-volume"></i> Quick phone follow-up</span>
+                    <span><i class="fa-solid fa-location-dot"></i> Sundhara, Kathmandu</span>
+                </div>
+            </aside>
+            <div class="glass-floating premium-form-card">
+                <form id="booking-form-page" class="premium-form">
+                    <div class="form-section-title">Guest details</div>
                     <div class="row-group">
                         <div class="input-group">
                             <label>Full Name</label>
@@ -584,9 +660,10 @@ function buildBookingPage() {
                         </div>
                     </div>
                     <div class="input-group">
-                        <label>Email</label>
-                        <input type="email" id="b-email-page" required>
+                        <label>Email <span style="text-transform:none; letter-spacing:0;">(optional)</span></label>
+                        <input type="email" id="b-email-page">
                     </div>
+                    <div class="form-section-title">Stay details</div>
                     <div class="input-group">
                         <label>Room Type</label>
                         <select id="b-room-page" required>
@@ -614,13 +691,15 @@ function buildBookingPage() {
                         </div>
                     </div>
                     <div class="input-group">
-                        <label>Special Requests</label>
-                        <textarea id="b-message-page" rows="4"></textarea>
+                        <label>Special Requests <span style="text-transform:none; letter-spacing:0;">(optional)</span></label>
+                        <textarea id="b-message-page" rows="4" placeholder="Arrival time, airport pickup, food preference, or any note"></textarea>
                     </div>
                     <input type="text" id="b-honeypot-page" name="website" style="display:none;" tabindex="-1" autocomplete="off">
                     <div class="form-status" id="form-status-page" style="margin-bottom: 24px; font-family: var(--font-label); color: var(--primary);"></div>
-                    <div style="display:flex; gap: 24px;">
-                        <button type="submit" class="btn-primary" id="booking-submit-btn-page">Confirm Booking</button>
+                    <div class="form-action-row">
+                        <button type="submit" class="btn-primary booking-submit-highlight" id="booking-submit-btn-page">
+                            <i class="fa-solid fa-calendar-check"></i> Request Confirmation
+                        </button>
                     </div>
                 </form>
             </div>
@@ -629,25 +708,49 @@ function buildBookingPage() {
 }
 
 function buildContactPage() {
+    const contactPhoneRaw = settings.contactPhone || '01-5904107, 9761799648';
+    const callPhone = contactPhoneRaw.split(',')[0].trim().replace(/[^+\d]/g, '');
+    const waPhone = contactPhoneRaw.split(',').pop().trim().replace(/\D/g, '');
+    const waHref = `https://wa.me/${waPhone.startsWith('977') ? '' : '977'}${waPhone}?text=${encodeURIComponent('Hello Hotel Grand Tokyo, I want to ask about rooms and booking.')}`;
     return `
     <section class="page-hero">
         <div class="container fade-in" style="width:100%;">
             <span class="label">Connect</span>
-            <h1 class="page-hero-title">Get In Touch</h1>
+            <h1 class="page-hero-title">Contact Hotel Grand Tokyo</h1>
         </div>
     </section>
-    <section class="fade-in" style="padding-top: 64px;">
-        <div class="container" style="max-width: 800px;">
-            <div class="glass-floating" style="padding: 48px;">
-                <form id="contact-form">
+    <section class="fade-in contact-page-section">
+        <div class="container contact-page-shell">
+            <aside class="contact-info-panel">
+                <span class="label">Talk to us directly</span>
+                <h2>Need help choosing a room?</h2>
+                <p>For faster answers, call or WhatsApp the hotel. Use the form for room questions, group stays, airport pickup, or feedback.</p>
+                <div class="contact-quick-list">
+                    <a href="tel:${callPhone}">
+                        <i class="fa-solid fa-phone"></i>
+                        <span><strong>Call front desk</strong><small>${contactPhoneRaw}</small></span>
+                    </a>
+                    <a href="${waHref}" target="_blank">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        <span><strong>WhatsApp booking</strong><small>Fast reply for availability</small></span>
+                    </a>
+                    <a href="https://maps.app.goo.gl/WLFHrGWnmrztDVqFA" target="_blank">
+                        <i class="fa-solid fa-map-location-dot"></i>
+                        <span><strong>Find the hotel</strong><small>Sundhara, Kathmandu</small></span>
+                    </a>
+                </div>
+            </aside>
+            <div class="glass-floating premium-form-card">
+                <form id="contact-form" class="premium-form">
+                    <div class="form-section-title">Your message</div>
                     <div class="row-group">
                         <div class="input-group">
                             <label>Full Name</label>
-                            <input type="text" id="c-name" required maxlength="50" pattern="[a-zA-Z\s]+" title="Name should only contain letters and spaces">
+                            <input type="text" id="c-name" placeholder="Your full name" required maxlength="50" pattern="[a-zA-Z\s]+" title="Name should only contain letters and spaces">
                         </div>
                         <div class="input-group">
                             <label>Email</label>
-                            <input type="email" id="c-email" required>
+                            <input type="email" id="c-email" placeholder="name@example.com" required>
                         </div>
                     </div>
                     <div class="row-group">
@@ -663,18 +766,18 @@ function buildContactPage() {
                             <select id="c-subject" required>
                                 <option value="">Select a subject</option>
                                 <option value="Inquiry">General Inquiry</option>
-                                <option value="Concierge">Concierge Services</option>
+                                <option value="Reservation">Room Reservation</option>
                                 <option value="Feedback">Feedback</option>
                             </select>
                         </div>
                     </div>
                     <div class="input-group">
                         <label>Message</label>
-                        <textarea id="c-message" rows="5" required></textarea>
+                        <textarea id="c-message" rows="5" placeholder="Tell us your arrival date, room need, or question." required></textarea>
                     </div>
                     <input type="text" id="c-honeypot" style="display:none;">
                     <div class="form-status" id="contact-status" style="margin-bottom: 24px; font-family: var(--font-label); color: var(--primary);"></div>
-                    <button type="submit" class="btn-primary">Send Message</button>
+                    <button type="submit" class="btn-primary booking-submit-highlight"><i class="fa-solid fa-paper-plane"></i> Send Message</button>
                 </form>
             </div>
         </div>
@@ -867,35 +970,45 @@ function buildRoomCard(room) {
     if (images.length === 0) images.push('https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop');
 
     const roomLink = `#Room/${encodeURIComponent(room.Title)}`;
+    const roomTitle = String(room.Title || 'Room');
+    const roomPrice = room.Price || 'Ask for today\'s rate';
+    const roomGuests = room.Guests || 'Comfortable stay';
+    const roomDesc = room.Description || 'Clean room with essential facilities for a comfortable Kathmandu stay.';
+    const amenityText = room.Amenities || room.Features || 'Free Wi-Fi, Attached bathroom, Daily housekeeping';
+    const amenities = String(amenityText).split(',').map(item => item.trim()).filter(Boolean).slice(0, 4);
     
     return `
     <div class="room-card fade-in" onclick="location.hash='${roomLink}'" style="cursor:pointer;">
         <div class="room-img-wrap">
             <div class="room-img-slider">
-                ${images.map((img, i) => `<img src="${img}" alt="${room.Title}" class="${i === 0 ? 'active' : ''}">`).join('')}
+                ${images.map((img, i) => `<img src="${img}" alt="${roomTitle}" class="${i === 0 ? 'active' : ''}" loading="lazy">`).join('')}
             </div>
-            ${images.length > 1 ? '<div class="slider-hint"><i class="fa-solid fa-images"></i> View All Photos</div>' : ''}
+            <div class="room-price-pill">${roomPrice}</div>
+            ${images.length > 1 ? '<div class="slider-hint"><i class="fa-solid fa-images"></i> Photos</div>' : ''}
         </div>
         <div class="room-details">
-            <span class="label">${room.Guests || 'Luxurious Stay'}</span>
-            <h3>${room.Title}</h3>
-            <p>${room.Description}</p>
+            <span class="label">${roomGuests}</span>
+            <h3>${roomTitle}</h3>
+            <p>${roomDesc}</p>
+            <div class="amenity-list">
+                ${amenities.map(item => `<span><i class="fa-solid fa-check"></i> ${item}</span>`).join('')}
+            </div>
             <div class="room-meta">
-                <div class="price-badge">${room.Price || 'Inquire for Price'}</div>
-                <div class="book-link">Explore Details &rarr;</div>
+                <div class="price-badge">${roomPrice}</div>
+                <button class="book-link" onclick="event.stopPropagation(); openModal('${roomTitle.replace(/'/g, "\\'")}', false, '${String(roomPrice).replace(/'/g, "\\'")}')">Book Now</button>
             </div>
         </div>
     </div>`;
 }
 
 function buildServiceCard(service) {
-    const bgImg = service.ImageURL ? `<img src="${service.ImageURL}" alt="${service.Title}">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
+    const bgImg = service.ImageURL ? `<img src="${service.ImageURL}" alt="${service.Title}" loading="lazy">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
     return `
     <div class="room-card fade-in">
         <div class="room-img-wrap" style="height: 250px;">
             ${bgImg}
         </div>
-        <div class="room-details" style="background: var(--surface-dim); margin-top: 0;">
+        <div class="room-details" style="margin-top: 0;">
             <span class="label"><i class="fa-solid ${service.Icon || 'fa-star'}"></i></span>
             <h3>${service.Title}</h3>
             <p style="margin-bottom:0;">${service.Description}</p>
@@ -904,7 +1017,7 @@ function buildServiceCard(service) {
 }
 
 function buildOfferCard(offer) {
-    const bgImg = offer.ImageURL ? `<img src="${offer.ImageURL}" alt="${offer.Title}">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
+    const bgImg = offer.ImageURL ? `<img src="${offer.ImageURL}" alt="${offer.Title}" loading="lazy">` : '<div style="width:100%; height:100%; background:var(--surface-bright);"></div>';
     
     // Check if rate/price exists - Ensure it's a string before calling trim()
     const rawRate = offer.Price || offer.Rate || '';
@@ -934,7 +1047,7 @@ function buildOfferCard(offer) {
                 ${hasRate ? `
                     <div class="offer-price-row">
                         <span class="offer-amount">${rate}</span>
-                        <button class="btn-offer-primary" onclick="openModal('${title.replace(/'/g, "\\'")}', true, '${rate}')" style="width:auto; padding: 12px 24px;">
+                        <button class="btn-offer-primary" onclick="openModal('${title.replace(/'/g, "\\'")}', true, '${rate.replace(/'/g, "\\'")}')" style="width:auto; padding: 12px 24px;">
                             <i class="fa-solid fa-calendar-check"></i> Book Now
                         </button>
                     </div>
@@ -974,8 +1087,8 @@ function buildTestimonialCard(t) {
     const photoUrl = t.AvatarURL || '';
     const initial = (t.Author || 'G').charAt(0).toUpperCase();
     const avatar = photoUrl
-        ? `<img src="${photoUrl}" alt="${t.Author}" style="width:52px; height:52px; border-radius:50%; object-fit:cover; border: 2px solid var(--primary); flex-shrink:0;">`
-        : `<div style="width:52px; height:52px; border-radius:50%; background: rgba(233,193,118,0.12); border: 2px solid var(--primary); display:flex; align-items:center; justify-content:center; font-family:var(--font-head); font-size:22px; color:var(--primary); flex-shrink:0;">${initial}</div>`;
+        ? `<img src="${photoUrl}" alt="${t.Author}" class="guest-avatar" loading="lazy">`
+        : `<div class="guest-avatar guest-avatar-fallback">${initial}</div>`;
 
     // Source badge from "Source" column (e.g. Google, Booking.com, TripAdvisor)
     const sourceBadge = t.Source
@@ -983,7 +1096,7 @@ function buildTestimonialCard(t) {
         : '';
 
     return `
-    <div class="glass-floating fade-in" style="padding: 32px; display:flex; flex-direction:column; gap:16px; min-height: 240px;">
+    <div class="glass-floating testimonial-card fade-in">
         <div style="display:flex; gap:3px;">${stars}</div>
         <p style="color: var(--on-surface-variant); font-size:15px; line-height:1.75; flex:1; font-style:italic; margin:0;">"${t.Quote || ''}"</p>
         <div style="display:flex; align-items:center; gap:14px; padding-top:16px; border-top:1px solid rgba(233,193,118,0.1);">
@@ -1287,6 +1400,7 @@ function handleScroll() {
 function openModal(roomName = null, isOffer = false, rate = null) {
     const modal = document.getElementById('booking-modal');
     modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
 
     const selects = [document.getElementById('b-room'), document.getElementById('b-room-page')];
     const rateInputs = [document.getElementById('b-rate'), document.getElementById('b-rate-page')];
@@ -1355,6 +1469,7 @@ function openModal(roomName = null, isOffer = false, rate = null) {
 function closeModal() {
     const modal = document.getElementById('booking-modal');
     modal.classList.remove('active');
+    document.body.style.overflow = '';
     
     // Reset dropdowns if they were in offer mode
     const selects = [document.getElementById('b-room'), document.getElementById('b-room-page')];
@@ -1646,12 +1761,16 @@ async function handleBookingSubmit(e) {
         pax: document.getElementById(`b-pax${sfx}`).value,
         rooms: document.getElementById(`b-rooms${sfx}`).value,
         message: combinedMessage,
-        adminEmail: settings.contactEmail || 'hotelgrandtokyo@gmail.com',
-        siteName: settings.siteName || 'Hotel Grand Tokyo'
+        source: 'official-website'
     };
 
     try {
-        const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(bookingData) });
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            credentials: 'omit',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(bookingData)
+        });
         const result = await response.json();
 
         if (result.status === 'success') {

@@ -1,11 +1,20 @@
 {
   "headers": [
     {
-      "source": "/(.*).(jpg|jpeg|png|svg|ico|css|js)",
+      "source": "/(.*).(jpg|jpeg|png|svg|ico)",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).(css|js)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
         }
       ]
     },
@@ -17,10 +26,32 @@
           "value": "public, max-age=3600, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' https: data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://script.google.com; frame-ancestors 'self'; upgrade-insecure-requests"
+        }
+      ]
     }
   ],
   "cleanUrls": true,
   "routes": [
+    { "src": "/managed/(.*)", "status": 404 },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
